@@ -1,6 +1,7 @@
 import csv
 import sys
 
+
 from util import Node, StackFrontier, QueueFrontier
 
 # Maps names to a set of corresponding person_ids
@@ -53,13 +54,13 @@ def load_data(directory):
 
 
 def main():
-    if len(sys.argv) > 2:
-        sys.exit("Usage: python degrees.py [directory]")
-    directory = sys.argv[1] if len(sys.argv) == 2 else "large"
+    #if len(sys.argv) > 2:
+    #    sys.exit("Usage: python degrees.py [directory]")
+    #directory = sys.argv[1] if len(sys.argv) == 2 else "large"
 
     # Load data from files into memory
     print("Loading data...")
-    load_data(directory)
+    load_data("/Users/juanvasquez/Documents/Repos/SixDegrees-KevinBacon/degrees/small")
     print("Data loaded.")
 
     source = person_id_for_name(input("Name: "))
@@ -88,12 +89,68 @@ def shortest_path(source, target):
     """
     Returns the shortest list of (movie_id, person_id) pairs
     that connect the source to the target.
-
     If no possible path, returns None.
     """
+    
+    #extract all actors with same name
+    pos_actor = people[source]
+    potential_sources = names[pos_actor["name"].lower()]
 
-    # TODO
-    raise NotImplementedError
+    #loop through potential actors
+    for source in potential_sources:
+        actor = Node(people[source], None, None)
+        q_fronteir = QueueFrontier()
+        current_parent = None
+
+        for movie in actor.state["movies"]:
+            q_fronteir.add(
+                Node({
+                    "person": actor,
+                    "movie": movie
+                }, current_parent, None)
+            )
+            current_parent = actor
+        visited = []
+        path = []
+
+        #loop through unexplored actors
+        idx = 0
+        while len(q_fronteir.frontier) > 0:
+            actor_data = q_fronteir.frontier[idx]
+            #loop through unexplored actors movies
+            actor_id = person_id_for_name(actor_data.state["person"].state["name"])
+            visited.append((actor_data.state["movie"], actor_id))
+            current_parent = actor_data
+
+            #if target actor is found
+            if actor_id == target:
+                result = actor_data
+
+                #loop through the path we took to get there and add it to the path list
+                while result.parent is not None:
+                    actor_id = person_id_for_name(result.state["person"].state["name"])
+                    path.insert(0, (result.state["movie"], actor_id))
+                    result = result.parent
+
+                #exit function since we found our target actor
+                return path
+            
+            #extract all co-stars for current unexplored actor
+            co_stars = neighbors_for_person(actor_id)
+            for co_star in co_stars:
+                #add co-stars to fronteir as long as it has not been explored
+                star = Node({
+                    "person": Node(people[co_star[1]], None, None),
+                    "movie": co_star[0]
+                }, current_parent, None)
+
+                if(co_star not in visited and co_star[1] != actor_id):
+                    q_fronteir.add(star)
+
+            #if target actor is not yet found
+            q_fronteir.remove()
+    
+    return None
 
 
 def person_id_for_name(name):
