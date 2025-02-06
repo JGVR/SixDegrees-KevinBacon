@@ -54,13 +54,13 @@ def load_data(directory):
 
 
 def main():
-    #if len(sys.argv) > 2:
-    #    sys.exit("Usage: python degrees.py [directory]")
-    #directory = sys.argv[1] if len(sys.argv) == 2 else "large"
+    if len(sys.argv) > 2:
+        sys.exit("Usage: python degrees.py [directory]")
+    directory = sys.argv[1] if len(sys.argv) == 2 else "large"
 
     # Load data from files into memory
     print("Loading data...")
-    load_data("/Users/juanvasquez/Documents/Repos/SixDegrees-KevinBacon/degrees/small")
+    load_data(directory)
     print("Data loaded.")
 
     source = person_id_for_name(input("Name: "))
@@ -92,65 +92,51 @@ def shortest_path(source, target):
     If no possible path, returns None.
     """
     
-    #extract all actors with same name
-    pos_actor = people[source]
-    potential_sources = names[pos_actor["name"].lower()]
+    #Intialize frontier and helpful fields
+    q_frontier = QueueFrontier()
+    visited = set()
 
-    #loop through potential actors
-    for source in potential_sources:
-        actor = Node(people[source], None, None)
-        q_fronteir = QueueFrontier()
-        current_parent = None
+    #add to frontier current actor
+    source_actor = Node(source, None, people[source]["movies"])
+    q_frontier.add(source_actor)
 
-        for movie in actor.state["movies"]:
-            q_fronteir.add(
-                Node({
-                    "person": actor,
-                    "movie": movie
-                }, current_parent, None)
-            )
-            current_parent = actor
-        visited = []
-        path = []
+    #loop through unexplored actors
+    while len(q_frontier.frontier) > 0:
+        actor = q_frontier.remove()
+        actor_id = actor.state
+        visited.add(actor_id)
+        
 
-        #loop through unexplored actors
-        idx = 0
-        while len(q_fronteir.frontier) > 0:
-            actor_data = q_fronteir.frontier[idx]
-            #loop through unexplored actors movies
-            actor_id = person_id_for_name(actor_data.state["person"].state["name"])
-            visited.append((actor_data.state["movie"], actor_id))
-            current_parent = actor_data
+        #if target actor is found
+        if actor_id == target:
+            #exit function since we found our target actor
+            return construct_path_to_target_actor(actor)
+        
+        #extract all co-stars for current unexplored actor
+        co_stars = neighbors_for_person(actor_id)
+        for co_star in co_stars:
+            add_actor_to_frontier(q_frontier, co_star[1], co_star[0], actor, visited)
 
-            #if target actor is found
-            if actor_id == target:
-                result = actor_data
-
-                #loop through the path we took to get there and add it to the path list
-                while result.parent is not None:
-                    actor_id = person_id_for_name(result.state["person"].state["name"])
-                    path.insert(0, (result.state["movie"], actor_id))
-                    result = result.parent
-
-                #exit function since we found our target actor
-                return path
-            
-            #extract all co-stars for current unexplored actor
-            co_stars = neighbors_for_person(actor_id)
-            for co_star in co_stars:
-                #add co-stars to fronteir as long as it has not been explored
-                star = Node({
-                    "person": Node(people[co_star[1]], None, None),
-                    "movie": co_star[0]
-                }, current_parent, None)
-
-                if(co_star not in visited and co_star[1] != actor_id):
-                    q_fronteir.add(star)
-
-            #if target actor is not yet found
-            q_fronteir.remove()
-    
     return None
+
+def construct_path_to_target_actor(actor):
+    result = []
+
+    #loop through the path we took to get there and add it to the path list
+    while actor.parent is not None:
+        result.append((actor.action, actor.state))
+        actor = actor.parent
+    
+    result.reverse()
+    return result
+
+def add_actor_to_frontier(frontier, actor_id, movie_id, current_parent, visited):
+    actor = Node(actor_id, current_parent, movie_id)
+
+    #Add actor if not yet visited and not already in frontier
+    if(actor_id not in visited and frontier.contains_state(actor.state) is not True):
+        frontier.add(actor)
+
 
 
 def person_id_for_name(name):
